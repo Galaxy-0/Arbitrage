@@ -1,0 +1,17 @@
+# Binaries and Objects
+*.bin
+*.exe
+*.o
+*.so
+*.dylib
+time_hedge
+time_hedge.1s
+
+# Rust
+time_hedge_rs/target/
+
+# System
+.DS_Store
+
+# User Data (Don't commit my debt!)
+.time_hedge_data.json
