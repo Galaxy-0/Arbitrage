@@ -1,10 +1,10 @@
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Deserialize, Serialize};
 
 // Dependencies needed in Cargo.toml:
 // [dependencies]
@@ -79,7 +79,13 @@ fn get_current_balance(state: &State) -> f64 {
 }
 
 fn format_duration(hours: f64) -> String {
-    let sign = if hours < 0.0 { "-" } else if hours > 0.0 { "+" } else { " " };
+    let sign = if hours < 0.0 {
+        "-"
+    } else if hours > 0.0 {
+        "+"
+    } else {
+        " "
+    };
     let abs_hours = hours.abs();
     let h = abs_hours as u64;
     let rem = abs_hours - (h as f64);
@@ -122,43 +128,63 @@ fn main() {
     let curr_bal = get_current_balance(&state);
     let formatted_time = format_duration(curr_bal);
 
-    let (icon, color) = if curr_bal < 0.0 {
-        ("🔴", "red")
+    // 颜色逻辑：根据【状态】而非余额
+    // Research = 花费 = 红
+    // Work = 赚钱 = 绿
+    // Idle = 暂停 = (如果有债则橙色警告，否则默认色)
+    let color = if state.mode == "RESEARCH" {
+        "#ff453a" // Red
+    } else if state.mode == "WORK" {
+        "#32d74b" // Green
+    } else if curr_bal < 0.0 {
+        "#ff9f0a" // Orange (Warning for debt)
     } else {
-        ("🟢", "green")
+        "primary" // Default system color
     };
 
-    let (icon_display, mode_text) = if state.mode == "IDLE" {
-        ("⚪️", "Idle")
+    // 覆盖逻辑：根据 State 决定最终图标
+    let (final_sf_image, mode_text) = if state.mode == "IDLE" {
+        ("pause.circle", "Idle")
     } else if state.mode == "RESEARCH" {
-        ("🧪", "Researching (4x Debt)")
+        ("atom", "Researching (4x Debt)")
     } else {
-        ("🔨", "Working (Payoff)")
+        ("keyboard", "Working (Payoff)")
     };
 
-    println!("{} {} | color={}", icon_display, formatted_time, color);
+    // 顶栏输出
+    if color == "primary" {
+        println!("{} | sfimage={}", formatted_time, final_sf_image);
+    } else {
+        println!(
+            "{} | color={} sfimage={}",
+            formatted_time, color, final_sf_image
+        );
+    }
+
     println!("---");
-    println!("当前状态: {}", mode_text);
-    println!("当前余额: {} ({:.4}h)", formatted_time, curr_bal);
+    println!("current state: {}", mode_text);
+    println!("current balance: {} | font=Menlo", formatted_time);
     println!("---");
 
     let exe = env::current_exe().unwrap();
     let exe_path = exe.to_string_lossy();
-    
-    // Note: We need to output the bash wrapper calling the binary if we want to replace it fully, 
-    // but here we just point to ourselves.
-    // However, SwiftBar needs the .sh wrapper to execute this binary anyway.
-    // So we just print the path to THIS binary, assuming the wrapper handles it?
-    // Actually, to update the menu items to call THIS binary, we should point to the wrapper location?
-    // For simplicity, let's point to the binary itself and rely on the wrapper fix we did earlier 
-    // OR we just point to the known symlink path.
-    // But wait, the previous fix uses a wrapper `time_hedge.1s.sh` that execs `time_hedge.bin`.
-    // If we replace `time_hedge.bin` with this Rust binary, the wrapper still works!
-    
-    // To be safe, let's just print the raw path.
-     println!("🧪 启动研究 (Research) | bash='{}' param1='research' terminal=false refresh=true", exe_path);
-     println!("🔨 启动搬砖 (Work) | bash='{}' param1='work' terminal=false refresh=true", exe_path);
-     println!("⏸ 停止计时 (Stop) | bash='{}' param1='stop' terminal=false refresh=true", exe_path);
-     println!("---");
-     println!("♻️ 债务清零 (Reset) | bash='{}' param1='reset' terminal=false refresh=true", exe_path);
+
+    // 菜单项也加上图标
+    println!(
+        "启动研究 (Research) | bash='{0}' param1='research' terminal=false refresh=true sfimage=atom",
+        exe_path
+    );
+    println!(
+        "启动搬砖 (Work) | bash='{0}' param1='work' terminal=false refresh=true sfimage=keyboard",
+        exe_path
+    );
+    println!(
+        "停止计时 (Stop) | bash='{0}' param1='stop' terminal=false refresh=true sfimage=pause.circle",
+        exe_path
+    );
+    println!("---");
+    println!(
+        "债务清零 (Reset) | bash='{0}' param1='reset' terminal=false refresh=true sfimage=trash",
+        exe_path
+    );
 }
